@@ -15,6 +15,7 @@ Where:
 """
 import re
 from datetime import datetime
+from urllib.parse import quote
 
 import requests
 from bs4 import BeautifulSoup
@@ -25,6 +26,7 @@ from anime_collector import requests_headers
 url_base = 'https://smotret-anime.com'  # Similar anime365
 url_recent = url_base + '/translations/recent?page=%s'
 url_ass_download = url_base + '/translations/ass/%s?download=1'  # .ass - subtitles extension :)
+url_search = url_base + '/catalog/search?q=%s'
 
 
 def resolve_ass_url(url_episode):
@@ -63,13 +65,13 @@ def parse_episode_number(episode_url):
 
 def parse_recent_line(recent_line):
     """
-    Parse one /recent line to tuple with episode type, number, name (Original),
+    Parses one /recent line to tuple with episode type, number, name (Original),
     release date and resolved (!) ass subtitles url.
     """
     a = recent_line.find('a')
     episode_url = a['href']
     episode = parse_episode_number(episode_url)
-    name = a.text.split("/")[1:]
+    name = a.text.split(" / ")[1:]  # Spaces for cases when anime name contains slash in name
     if len(name) > 1:
         name = name[0].strip()
     else:
@@ -92,3 +94,38 @@ def parse_recent_page(page=1):
         translations = filter(lambda item: "субтитры" in item.text, translations)
         translations = [parse_recent_line(item) for item in translations]
         return translations
+
+
+def parse_poster_url(search_item):
+    """
+    Parses poster URL from search result item.
+    """
+    style = search_item.find('div', class_='m-catalog-item__poster').find('a')['style']
+    return url_base + re.search("url\\('(.*)'\\)", style).group(1)
+
+
+def parse_original_name(search_item):
+    """
+    Parses original anime name from search result item.
+    """
+    raw = search_item.find('h3', class_='line-2').find('a')
+    # Spaces (in split) for cases when anime name contains slash in name
+    return "".join([t for t in raw.contents if type(t) == NavigableString]).strip().split(' / ')[0]
+
+
+def parse_anime_url(search_item):
+    """
+    Parses anime url from search result item.
+    """
+    return url_base + search_item.find('a', class_='m-catalog-item__more')['href']
+
+
+def parse_search_page(request):
+    """
+    Parses /catalog/search page with search request and returns names, urls and poster urls.
+    """
+    response = requests.get(url_search % quote(request), headers=requests_headers)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'lxml')
+        results = soup.find('div', class_='items').findAll('div', class_='card-content')
+        return [(parse_original_name(item), parse_anime_url(item), parse_poster_url(item)) for item in results]
