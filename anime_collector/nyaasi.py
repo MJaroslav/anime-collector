@@ -1,3 +1,6 @@
+"""
+bs4-based parser for nyaa (nyaa.si)
+"""
 from urllib.parse import quote
 
 import requests
@@ -10,10 +13,16 @@ url_search_rss = url_base + '/?page=rss&q=%s&c=1_4&f=0'
 
 
 def resolve_torrent_url(view_url):
+    """
+    Resolves direct download url for torrent from view url .
+    """
     return view_url.replace('view', 'download') + ".torrent"
 
 
 def parse_search_rss(request):
+    """
+    Parses RSS for raw category with search results.
+    """
     response = requests.get(url_search_rss % quote(request), headers=requests_headers)
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'lxml')

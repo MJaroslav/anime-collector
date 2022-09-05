@@ -110,7 +110,11 @@ def parse_original_name(search_item):
     """
     raw = search_item.find('h3', class_='line-2').find('a')
     # Spaces (in split) for cases when anime name contains slash in name
-    return "".join([t for t in raw.contents if type(t) == NavigableString]).strip().split(' / ')[0]
+    raw = "".join([t for t in raw.contents if type(t) == NavigableString]).strip().split(' / ')[0]
+    cyrillic_pos = re.search('[\u0400-\u04FF]', raw)  # Any cyrillic char
+    if cyrillic_pos:  # Can contain some word like as "сезон"
+        raw = raw[:cyrillic_pos.start()].strip()
+    return raw
 
 
 def parse_anime_url(search_item):
