@@ -19,6 +19,13 @@ def resolve_torrent_url(view_url):
     return view_url.replace('view', 'download') + ".torrent"
 
 
+def parse_search_item(item):
+    return {
+        "title": item.find('title').text,
+        'url': resolve_torrent_url(item.find('guid').text)
+    }
+
+
 def parse_search_rss(request):
     """
     Parses RSS for raw category with search results.
@@ -26,4 +33,4 @@ def parse_search_rss(request):
     response = requests.get(url_search_rss % quote(request), headers=requests_headers)
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'lxml')
-        return [(item.find('title').text, resolve_torrent_url(item.find('guid').text)) for item in soup.findAll('item')]
+        return [parse_search_item(item) for item in soup.findAll('item')]

@@ -65,10 +65,11 @@ def parse_episode_number(episode_url):
 
 def parse_recent_line(recent_line):
     """
-    Parses one /recent line to tuple with episode type, number, name (Original),
-    release date and resolved (!) ass subtitles url.
+    Parses one /recent line to dict with episode type, number, name (Original),
+    release date, translation language and resolved (!) ass subtitles url.
     """
     a = recent_line.find('a')
+    lang = "EN" if "английские" in recent_line.text else "RU"
     episode_url = a['href']
     episode = parse_episode_number(episode_url)
     name = a.text.split(" / ")[1:]  # Spaces for cases when anime name contains slash in name
@@ -79,7 +80,14 @@ def parse_recent_line(recent_line):
         name = name[0][:cyrillic_pos].strip()
     date = "".join([t for t in recent_line.contents if type(t) == NavigableString]).strip()
     date = datetime.strptime(date, '%d.%m.%Y %H:%M')
-    return episode[0], episode[1], name, date, resolve_ass_url(episode_url)
+    return {
+        'episode_type': episode[0],
+        'episode_number': episode[1],
+        'title': name,
+        'release_date': date,
+        'translation_language': lang,
+        'url': resolve_ass_url(episode_url)
+    }
 
 
 def parse_recent_page(page=1):
@@ -91,7 +99,7 @@ def parse_recent_page(page=1):
         soup = BeautifulSoup(response.text, 'html.parser')
         translations = soup.findAll('div', class_='m-translation-item')
         # Only subtitles allowed without subscription
-        translations = filter(lambda item: "субтитры" in item.text, translations)
+        translations = filter(lambda item: "субтитры" in item.text and not "английские" in item.text, translations)
         translations = [parse_recent_line(item) for item in translations]
         return translations
 
@@ -124,6 +132,14 @@ def parse_anime_url(search_item):
     return url_base + search_item.find('a', class_='m-catalog-item__more')['href']
 
 
+def parse_search_item(item):
+    return {
+        "name": parse_original_name(item),
+        "url": parse_anime_url(item),
+        "poster_url": parse_poster_url(item)
+    }
+
+
 def parse_search_page(request):
     """
     Parses /catalog/search page with search request and returns names, urls and poster urls.
@@ -132,4 +148,4 @@ def parse_search_page(request):
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, 'lxml')
         results = soup.find('div', class_='items').findAll('div', class_='card-content')
-        return [(parse_original_name(item), parse_anime_url(item), parse_poster_url(item)) for item in results]
+        return [parse_search_item(item) for item in results]
